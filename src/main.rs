@@ -1,16 +1,14 @@
 use core::str;
 use embassy_sync::blocking_mutex::Mutex;
 
-use embassy_time::{Duration, Timer};
-//use esp_idf_hal::delay::FreeRtos;
+use esp_idf_hal::delay::FreeRtos;
 use esp_idf_hal::gpio::*;
 
 use esp_idf_hal::peripherals::Peripherals;
 use esp_idf_hal::task::embassy_sync::EspRawMutex;
-use esp_idf_hal::task::executor::EspExecutor;
 
 use esp_idf_sys as _; // If using the `binstart` feature of `esp-idf-sys`, always keep this module imported
-use esp_idf_sys::{self as sys, esp, EspError};
+use esp_idf_sys::{self as sys};
 use log::info;
 
 use std::cell::RefCell;
@@ -23,33 +21,12 @@ static LED_PIN: static_cell::StaticCell<Arc<Mutex<EspRawMutex, RefCell<LedPin>>>
 
 sys::esp_app_desc!();
 
-fn main() -> Result<(), EspError> {
-    init()?;
-    run()
-}
-
-fn init() -> Result<(), EspError> {
+fn main() -> anyhow::Result<()> {
     sys::link_patches();
     esp_idf_hal::task::critical_section::link();
-    esp_idf_svc::timer::embassy_time::driver::link();
-    esp_idf_svc::timer::embassy_time::queue::link();
 
     esp_idf_svc::log::EspLogger::initialize_default();
 
-    unsafe {
-        #[allow(clippy::needless_update)]
-        esp!(sys::esp_vfs_eventfd_register(
-            &sys::esp_vfs_eventfd_config_t {
-                max_fds: 5,
-                ..Default::default()
-            }
-        ))?;
-    }
-
-    Ok(())
-}
-
-fn run() -> Result<(), EspError> {
     info!("Hello, world!");
 
     let peripherals = Peripherals::take().unwrap();
@@ -62,43 +39,48 @@ fn run() -> Result<(), EspError> {
         pin.set_low().unwrap();
     });
 
-    let executor = EspExecutor::<16, _>::new();
     let led_pin1 = led_pin_handle.clone();
-
-    let task1 = executor
-        .spawn_local(async move {
-            loop {
-                log::info!("task1");
-                Timer::after(Duration::from_secs_floor(2)).await;
-                //Timer::after(Duration::from_secs(2)).await;
-                //embassy_time::Timer::after(embassy_time::Duration::from_millis(500)).await;
-                //FreeRtos::delay_ms(500);
-                led_pin1.lock(|led_pin1| {
-                    let mut pin = led_pin1.borrow_mut();
-                    pin.set_high().unwrap();
-                });
-            }
-        })
-        .unwrap();
-
     let led_pin2 = led_pin_handle.clone();
-    let task2 = executor
-        .spawn_local(async move {
-            loop {
-                log::info!("task2");
-                Timer::after(Duration::from_secs_floor(4)).await;
-                //Timer::after(Duration::from_secs(4)).await;
-                //embassy_time::Timer::after(embassy_time::Duration::from_millis(1000)).await;
-                //FreeRtos::delay_ms(1000);
-                led_pin2.lock(|led_pin2| {
-                    let mut pin = led_pin2.borrow_mut();
-                    pin.set_low().unwrap();
-                });
+
+    let thread0 = std::thread::Builder::new()
+        .stack_size(7000)
+        .spawn(move || worker(led_pin1, true, "Task1", 500))?;
+    let thread1 = std::thread::Builder::new()
+        .stack_size(7000)
+        .spawn(move || worker(led_pin2, false, "Task2", 1000))?;
+
+    info!("Waiting for worker threads");
+
+    thread0.join().unwrap()?;
+    thread1.join().unwrap()?;
+
+    info!("Joined worker threads");
+
+    info!("Done");
+
+    loop {
+        // Don't let the idle task starve and trigger warnings from the watchdog.
+        FreeRtos::delay_ms(100);
+    }
+}
+
+fn worker(
+    led_pin: Arc<Mutex<EspRawMutex, RefCell<LedPin>>>,
+    high: bool,
+    log_prefix: &str,
+    sleep: u32,
+) -> anyhow::Result<()> {
+    loop {
+        info!("{} Run", log_prefix);
+        led_pin.lock(|led_pin| {
+            let mut pin = led_pin.borrow_mut();
+            if high {
+                pin.set_high().unwrap();
+            } else {
+                pin.set_low().unwrap();
             }
-        })
-        .unwrap();
+        });
 
-    executor.run_tasks(|| true, [task1, task2]);
-
-    Ok(())
+        FreeRtos::delay_ms(sleep);
+    }
 }
