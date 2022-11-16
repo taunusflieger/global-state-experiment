@@ -17,7 +17,7 @@ static LED_PIN: static_cell::StaticCell<Arc<Mutex<EspRawMutex, RefCell<LedPin>>>
 which provides a thread safe way to handle access to the shared GPIO pin
 
 ## How to build?
-The project is targeting the [`esp-rust-board`](https://github.com/esp-rs/esp-rust-board) which uses a ESP32C3 SoC. The led pin used is GPIO7.
+The project is targeting the [`esp-rust-board`](https://github.com/esp-rs/esp-rust-board) which uses a esp32c3 SoC. The led pin used is GPIO7.
 
 ```sh
 cargo espflash flash --monitor --port /dev/ttyACM0  
