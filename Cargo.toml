@@ -1,0 +1,44 @@
+[package]
+name = "global-state-experiment"
+version = "0.1.0"
+authors = ["Michael Zill <michael.zill@gmail.com>"]
+edition = "2021"
+resolver = "2"
+
+[profile.release]
+opt-level = "s"
+
+[profile.dev]
+debug = true # Symbols are nice and they don't increase the size on Flash
+opt-level = "z"
+
+[features]
+pio = ["esp-idf-sys/pio"]
+
+[dependencies]
+
+heapless = "0.7"
+futures = {version = "0.3", features = ["async-await"] }
+
+
+embedded-hal = { version = "0.2" }
+embedded-svc = { git = "https://github.com/esp-rs/embedded-svc", features = ["nightly", "experimental"] }
+esp-idf-sys = { git = "https://github.com/esp-rs/esp-idf-sys", features = ["binstart"] }
+esp-idf-svc = { git = "https://github.com/esp-rs/esp-idf-svc", features = ["nightly", "experimental", "embassy-time-isr-queue"] }
+esp-idf-hal = { git = "https://github.com/esp-rs/esp-idf-hal", features = ["edge-executor", "embassy-sync", "critical-section"] }
+embassy-futures = { version = "0.1" }
+embassy-sync = { version = "0.1", features = ["std"] }
+embassy-time = { version = "0.1" }
+static_cell = { version = "1" }
+#esp32s3 = "0.3"
+anyhow = "1.0"
+toml-cfg = "0.1"
+url = "2"
+log = { version = "0.4", features = ["max_level_debug","release_max_level_debug"] }
+
+[build-dependencies]
+embuild = "0.30"
+anyhow = "1"
+
+[patch.crates-io]
+esp-idf-sys = {git = "https://github.com/esp-rs/esp-idf-sys"}
