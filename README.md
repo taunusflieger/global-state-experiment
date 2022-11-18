@@ -1,6 +1,5 @@
 # global-state-experiment
 
-**WIP**
 
 This project helped me to answer the question how to share a GPIO pin across different threads. There are two branches:
 * **FreeRTOS-Threads** here the threads are created using EP-IDF FreeRTOS
